@@ -1,0 +1,263 @@
+{
+
+	"fonts": [
+
+		{
+			"font_name": "regular",
+			"font": "Lato",
+			"font_size": 12,
+			"font_weight": "bold"
+		},
+
+		{
+			"font_name": "medium",
+			"font": "Lato",
+			"font_size": 25,
+			"font_weight": "normal"
+		},
+
+
+		{
+			"font_name": "large",
+			"font": "Lato",
+			"font_size": 30,
+			"font_weight": "normal"
+		},
+
+		{
+			"font_name": "big",
+			"font": "Lato",
+			"font_size": 40,
+			"font_weight": "normal"
+		},
+
+
+		{
+			"font_name": "huge",
+			"font": "Lato",
+			"font_size": 150,
+			"font_weight": "normal"
+		}
+
+	],
+
+
+	"themes": [
+
+
+		{
+
+			"name": "D A R K   T H E M E",
+
+			"widgets": {
+
+				"root": {
+					"background": "#2e3138"
+				},
+
+
+
+				"video_preview_frame": {
+					"background": "#24252a"
+				},
+
+				"video_preview_title" : {
+					"text": "P R E V I E W",
+					"background": "#454952",
+					"foreground": "#b2b2b2",
+					"font": "regular"
+				},
+
+				"video_preview_content": {
+					"background": "#24252a",
+					"foreground": "#731919",
+					"font": "huge",
+					"text_error": "\u26a0"
+				},
+
+
+
+				"attempts_frame": {
+					"background": "#24252a"
+				},
+
+				"attempts_title" : {
+					"background": "#454952",
+					"foreground": "#b2b2b2",
+					"font": "regular",
+					"text": "A T T E M P T S"
+				},
+
+				"attempts_content" : {
+					"background": "#24252a",
+					"foreground": "#b2b2b2",
+					"font": "large"
+				},
+
+
+
+				"timer_frame": {
+					"background": "#24252a"
+				},
+
+				"timer_title" : {
+					"background": "#454952",
+					"foreground": "#b2b2b2",
+					"font": "regular",
+					"text": "T I M E"
+				},
+
+				"timer_content" : {
+					"background": "#24252a",
+					"foreground": "#b2b2b2",
+					"font": "large"
+				},
+
+
+
+				"code_selector_frame": {
+					"background": "#24252a"
+				},
+
+				"code_selector_title" : {
+					"background": "#454952",
+					"foreground": "#b2b2b2",
+					"font": "regular",
+					"text": "C O D E   S E L E C T O R"
+				},
+
+				"code_selector_content" : {
+					"background": "#24252a"
+				},
+
+				"code_selector_button": {
+					"background": "#454952",
+					"foreground": "#b2b2b2",
+					"background_active": "#b2b2b2",
+					"foreground_active": "#454952",
+					"background_disabled": "#2c2e33",
+					"foreground_disabled": "#35373d",
+					"background_selected": "#f5ad42",
+					"foreground_selected": "#454952",
+					"flash_error": "#731919",
+					"flash_action": "#1c74e8",
+					"flash_guessed": "#135e27",
+					"font": "large"
+				},
+
+
+
+				"feedback_evaluation_frame": {
+					"background": "#24252a"
+				},
+
+				"feedback_evaluation_title" : {
+					"background": "#454952",
+					"foreground": "#b2b2b2",
+					"font": "regular",
+					"text": "F E E D B A C K   E V A L U A T I O N"
+				},
+
+				"feedback_evaluation_scale" : {
+					"background": "#24252a",
+					"foreground": "#b2b2b2",
+					"foreground_disabled": "#35373d",
+					"trough": "#454952",
+					"trough_disabled": "#2c2e33",
+					"font": "regular"
+				},
+
+				"feedback_evaluation_button": {
+					"background": "#24252a",
+					"foreground": "#454952",
+					"background_active": "#24252a",
+					"foreground_active": "#b2b2b2",
+					"foreground_disabled": "#2c2e33",
+					"font": "big",
+					"text": "\u27a4"
+				},
+
+
+
+				"feedback_indicator_frame": {
+					"background": "#24252a"
+				},
+
+				"feedback_indicator_title" : {
+					"background": "#454952",
+					"foreground": "#b2b2b2",
+					"font": "regular",
+					"text": "F E E D B A C K"
+				},
+
+				"feedback_indicator_content": {
+					"background": "#24252a",
+					"foreground": "#b2b2b2",
+					"foreground_required": "#135e27",
+					"foreground_not_required": "#731919",
+					"font": "medium",
+					"text": "\u2b24"
+				},
+
+
+
+				"code_frame": {
+					"background": "#24252a"
+				},
+
+				"code_title": {
+					"background": "#454952",
+					"foreground": "#b2b2b2",
+					"font": "regular",
+					"text": "C O D E"
+				},
+
+				"code_content": {
+					"background": "#24252a",
+					"foreground": "#b2b2b2",
+					"font": "large",
+					"text_empty": "\u2205"
+				},
+
+
+
+				"flow_button": {
+					"background": "#454952",
+					"foreground": "#b2b2b2",
+					"background_active": "#b2b2b2",
+					"foreground_active": "#454952",
+					"background_disabled": "#2c2e33",
+					"foreground_disabled": "#35373d",
+					"font": "regular",
+					"text_start": "S T A R T",
+					"text_stop": "S T O P"
+				},
+
+				"reset_button": {
+					"background": "#454952",
+					"foreground": "#b2b2b2",
+					"background_active": "#b2b2b2",
+					"foreground_active": "#454952",
+					"background_disabled": "#2c2e33",
+					"foreground_disabled": "#35373d",
+					"font": "regular",
+					"text": "R E S E T"
+				},
+
+
+
+				"theme_selector": {
+					"background": "#454952",
+					"foreground": "#b2b2b2",
+					"background_active": "#b2b2b2",
+					"foreground_active": "#454952",
+					"font": "regular"
+				}
+
+			}
+
+		}
+		
+	]
+
+}
