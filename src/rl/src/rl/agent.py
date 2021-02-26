@@ -95,9 +95,6 @@ class Agent:
 
 	get_optimal()
 		Restituisce la politica ottimale	
-
-	get_qmatrix_str()
-		Restituisce la matrice Q in stringa
 	"""
 
 	def __init__(self, env, alpha=0.7, gamma=0.9, epsilon=0.999, epsilon_mode=EPSILON_MODES[1], epsilon_decay=0.95, epsilon_low=0.1):
@@ -332,20 +329,3 @@ class Agent:
 		while not self.env.is_terminal_state(optimal):
 			optimal = frozenbag(list(optimal) + [np.argmax(self.qmatrix[optimal])])
 		return optimal
-
-
-	def get_qmatrix_str(self):
-
-		"""
-		Restituisce la matrice Q in stringa
-
-		Returns
-		-----------------------------------
-		(str) qmatrix
-			Matrice Q in stringa
-		"""
-
-		qmatrix_str = ""
-		for state in self.qmatrix.keys():
-			qmatrix_str += '   {0:>{1}}: '.format('{' + str(list(state))[1:-1] + '}', 10) + str(self.qmatrix[state]) + '\n'
-		return qmatrix_str

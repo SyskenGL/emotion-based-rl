@@ -9,15 +9,15 @@
 		"res": "480p",
 		"format": "avi",
 		"duration": 10000,
-		"video_path": "/home/sysken",
+		"video_path": "/home/sysken/Progetti/emotion-based-rl/src/app/src/app/data/tmp",
 		"video_name_prefix": "feedback_"
 	},
 
 	"analyzer": {
 		"docker_image_repository": "affdex",
 		"docker_image_tag": "4.0",
-		"video_path": "/home/sysken",
-		"csv_path": "/home/sysken"
+		"video_path": "/home/sysken/Progetti/emotion-based-rl/src/app/src/app/data/tmp",
+		"csv_path": "/home/sysken/Progetti/emotion-based-rl/src/app/src/app/data/csv"
 	},
 
 	"win": {
@@ -34,7 +34,13 @@
 		"no_actions": 4,
 		"code_len": 3,
 		"session_prefix": "session_",
-		"step_delay": 2000
+		"epoch_delay": 1
+	},
+
+	"db": {
+		"db_name": "db",
+		"db_path": "/home/sysken/Progetti/emotion-based-rl/src/app/src/app/data/db",
+		"default_table": "rl_session"
 	}
 
 }

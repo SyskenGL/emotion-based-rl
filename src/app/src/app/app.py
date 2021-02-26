@@ -13,6 +13,7 @@ import time
 import gym
 import rl.gym_mastermind.envs.mastermind_env
 from tinydb import TinyDB
+from collections_extended import frozenbag
 from utils.feedback_highlighter import FeedbackHighlighter
 from utils.emotion_analyzer import EmotionAnalyzer
 from rl.agent import Agent
@@ -32,6 +33,14 @@ if __name__ == "__main__":
 
 	with open(APP_PATH + '/style/styles.json') as STYLES_FILE:
 	  	STYLES = json.load(STYLES_FILE) 
+
+	DB = TinyDB(
+		CONFIG['db']['db_path'] + '/' + CONFIG['db']['db_name'] + '.json',
+		default_table=CONFIG['db']['default_table'],
+		sort_keys=True, 
+		indent=4, 
+		separators=(',', ': ')
+	)
 
 
 	# application----------------------------------------------------------------
@@ -55,20 +64,18 @@ if __name__ == "__main__":
 			self.init_themes()
 			self.curr_theme = CONFIG['win']['default_theme']
 
-
 			# flags
 			self.stopped = True
 			self.stoppable = False
 			self.exit = False
-			self.rl_initialized = False
 			self.feedback_required = False
 			self.feedback_provided = False
 			self.feedback_frame = False
 												
-
 			# status
-			self.db_record = None
-			self.feedback = {}
+			self.rl_session = None
+			self.env = None
+			self.agent = None
 			self.feedback_id = None
 			self.time_secs = 0
 			self.last_time_secs = None
@@ -77,8 +84,8 @@ if __name__ == "__main__":
 			self.secret = np.full(
 				CONFIG['rl']['code_len'], None
 			)
-			self.env = None
-			self.agent = None
+
+			# camera
 			self.feedback_highlighter = FeedbackHighlighter(
 				CONFIG['highlighter']['fps'], 
 				CONFIG['highlighter']['res'],
@@ -94,7 +101,7 @@ if __name__ == "__main__":
 			)
 			self.vcap = self.init_camera()
 
-
+			# mainloop
 			self.mainloop_cv = Condition()
 			self.stoppable_mutex = Lock()
 			self.mainloop_thread = self.mainloop()
@@ -290,11 +297,11 @@ if __name__ == "__main__":
 			self.widgets['flow_button'].configure(command=self.on_flow_button_clicked)
 
 
-		def init_db_record(self):
+		def init_rl_session(self):
 			return {
 				'session_id': CONFIG['rl']['session_prefix'] + str(int(time.time()*1000)),
 				'config': {
-					'secret': self.env.secret,
+					'secret': list(self.secret),
 					'no_pegs': self.env.action_space.n,
 					'code_len': len(self.env.secret),
 					'alpha': self.agent.alpha,
@@ -311,7 +318,7 @@ if __name__ == "__main__":
 					'attempts': None,
 					'time': None
 				},
-				'feedback': []
+				'feedback': {}
 			}
 
 
@@ -557,7 +564,7 @@ if __name__ == "__main__":
 
 		def update_code(self):
 			code = None
-			if self.rl_initialized:
+			if self.agent is not None:
 				code = list(self.agent.curr_state)
 			if code is None or len(code) == 0:
 				theme = self.themes[self.curr_theme]
@@ -680,8 +687,8 @@ if __name__ == "__main__":
 						step, 
 						action, 
 						theme['code_selector_button']['flash_guessed'],
-						flash_count=1,
-						delay=1500
+						flash_count=3,
+						delay=500
 					)
 
 
@@ -728,6 +735,10 @@ if __name__ == "__main__":
 
 
 		def on_reset_button_clicked(self):
+			if self.rl_session is not None:
+				self.fill_rl_session_result()
+				DB.insert(self.rl_session)
+				self.rl_session = None
 			self.reset()
 			self.refresh()
 
@@ -740,8 +751,9 @@ if __name__ == "__main__":
 		def on_feedback_evaluation_button_clicked(self):
 			self.evaluation = self.widgets['feedback_evaluation_scale'].get()
 			self.feedback_id = CONFIG['highlighter']['video_name_prefix'] + str(int(time.time()*1000))
-			self.feedback[self.feedback_id] = {
+			self.rl_session['feedback'][self.feedback_id] = {
 				'evaluation': self.evaluation,
+				'attempt': list(self.agent.curr_state),
 				'time': str(int(self.time_secs/60)).zfill(2) + ':' + str(int(self.time_secs%60)).zfill(2)
 			}
 			with self.mainloop_cv:
@@ -768,7 +780,7 @@ if __name__ == "__main__":
 		def reset(self):
 			self.feedback_provided = False
 			self.feedback_frame = False
-			self.rl_initialized = False
+			self.rl_session = None
 			with self.mainloop_cv:
 				self.feedback_required = False
 				self.stopped = True
@@ -782,12 +794,23 @@ if __name__ == "__main__":
 			self.agent = None
 
 
-		def fill_db_record_result(self):
-			self.db_record['result']['guessed'] = self.env.is_guessed()
-			self.db_record['result']['optimal'] = self.agent.get_optimal()
-			self.db_record['result']['qmatrix'] = self.agent.get_qmatrix_str()
-			self.db_record['result']['attempts'] = self.attempts
-			self.db_record['result']['time'] = self.time
+		def fill_rl_session_result(self):
+			qmatrix = {}
+			for state in self.agent.qmatrix.keys():
+				state_str = '{' + str(list(state))[1:-1] + '}'
+				qmatrix[state_str] = str(list(self.agent.qmatrix[state]))
+			time_str = str(int(self.time_secs/60)).zfill(2) + ':' + str(int(self.time_secs%60)).zfill(2)
+			self.rl_session['result']['guessed'] = self.env.is_guessed()
+			self.rl_session['result']['optimal'] = list(self.agent.get_optimal())
+			self.rl_session['result']['qmatrix'] = qmatrix
+			self.rl_session['result']['attempts'] = self.attempts
+			self.rl_session['result']['time'] = time_str
+			for feedback_id in self.rl_session['feedback'].keys():
+				csv_path = CONFIG['analyzer']['csv_path'] + '/' + feedback_id + '.csv'
+				if os.path.isfile(csv_path):
+					self.rl_session['feedback'][feedback_id]['csv_path'] = csv_path
+				else:
+					self.rl_session['feedback'][feedback_id]['csv_path'] = None
 
 
 		# services--------------------------------------------------
@@ -835,62 +858,84 @@ if __name__ == "__main__":
 
 				while not self.exit:
 
+					# Verifica se l'applicazione è stata fermata o se è richiesto un feedback
+					# in caso affermativo rimane in attesa passiva
 					with self.mainloop_cv:
 						while self.stopped or self.feedback_required:
+							# In caso di uscita salva i dati se presenti
 							if self.exit:
+								if self.rl_session is not None:
+									self.fill_rl_session_result()
+									DB.insert(self.rl_session)
+									self.rl_session = None
 								return
 							self.mainloop_cv.wait()
 
-
-					if not self.rl_initialized:
+					# Inializzazione sessione RL
+					if self.rl_session is None:
 						self.env = gym.make(
 							CONFIG['rl']['gym'], 
 							no_pegs=CONFIG['rl']['no_actions'], 
 							secret=self.secret
 						)
 						self.agent = Agent(self.env)
-						self.rl_initialized = True
+						self.rl_session = self.init_rl_session()
 
 					else:
 
+						# Ignora le eccezioni sul mainloop (grafica) quando si esce
+						# dall'applicazione senza che lo step RL sia terminato
 						try:
 
+							# Disabilita il pulsante di STOP
 							self.stoppable_mutex.acquire()
+							if self.stopped:
+								continue
 							self.stoppable = False
 							self.update_flow_button()
 							self.stoppable_mutex.release()
 
-							if self.stopped:
-								continue
-
+							# Se è stato fornito un feedback aggiorna la matrice Q
 							if self.feedback_provided:
 								self.agent.update_qmatrix(self.evaluation)
 								self.feedback_provided = False
 								self.agent.curr_state = self.env.reset()
-							elif not self.feedback_required:
 
+							# Altrimenti scegli un'azione da eseguire
+							elif not self.feedback_required:
 								action = self.agent.get_action_from_qmatrix()
 								self.feedback_required = self.agent.take_action(action)
+
+								# Se l'azione è terminale incrementa gli attempts
 								if self.feedback_required:
 									self.attempts += 1
+
+									# Se il multiset finale è corretto interrompi e salva i dati
 									if self.env.is_guessed():
+										self.fill_rl_session_result()
+										DB.insert(self.rl_session)
+										self.rl_session = None
 										self.stopped = True
 										self.feedback_required = False
 										self.flash_guessed_code_selector()
+
+									# Altrimenti flash azione
 									else:
 										self.flash_action_code_selector(action)
+
+								# Altrimenti flash azione
 								else:
 									self.flash_action_code_selector(action)
 
+							# Riabilita il pulsante di STOP
 							time.sleep(1)
 							self.stoppable = True
 							self.refresh('rl')
-							time.sleep(CONFIG['rl']['step_delay'])
+							time.sleep(CONFIG['rl']['epoch_delay'])
 
 						except:
-							pass
+							raise
 
-			
 			self.init_gui()
 			self.init_listeners()
 			self.apply_theme()
