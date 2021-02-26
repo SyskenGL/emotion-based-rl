@@ -50,6 +50,9 @@ class MastermindEnv(gym.Env):
 		Restituisce tutti i possibili stati immediatamente successivi 
 		(raggiungibili con una sola azione) allo stato passato in ingresso
 
+	get_init_state()
+		Restituisce lo stato iniziale
+
 	is_done()
 		Verifica se l'agente si trova in uno stato terminale
 
@@ -232,6 +235,20 @@ class MastermindEnv(gym.Env):
 					'state': reachable_state
 				})
 		return reachable_states
+
+
+	def get_init_state(self):
+
+		"""
+		Restituisce lo stato iniziale
+
+		Returns
+		-----------------------------------
+		(list) state
+			Stato iniziale
+		"""
+
+		return frozenbag()
 
 
 	def is_done(self):

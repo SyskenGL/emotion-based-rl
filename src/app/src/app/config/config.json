@@ -1,0 +1,40 @@
+{
+
+	"vcap": {
+		"fps": 30
+	},
+
+	"highlighter": {
+		"fps": 15,
+		"res": "480p",
+		"format": "avi",
+		"duration": 10000,
+		"video_path": "/home/sysken",
+		"video_name_prefix": "feedback_"
+	},
+
+	"analyzer": {
+		"docker_image_repository": "affdex",
+		"docker_image_tag": "4.0",
+		"video_path": "/home/sysken",
+		"csv_path": "/home/sysken"
+	},
+
+	"win": {
+		"title": "Mastermind RL",
+		"default_theme": "D A R K   T H E M E",
+		"geometry": "1200x820",
+		"resizable": [false, false]
+	},
+
+	"rl": {
+		"gym": "mastermind-v0",
+		"max_evaluation": 3,
+		"min_evaluation": -1,
+		"no_actions": 4,
+		"code_len": 3,
+		"session_prefix": "session_",
+		"step_delay": 2000
+	}
+
+}

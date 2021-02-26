@@ -11,10 +11,10 @@ from collections_extended import frozenbag
 
 # constants------------------------------------------------------------------
 
-EPSILON_MODES = {
-	'e_greedy': 0,
-	'e_decaying': 1
-}
+EPSILON_MODES = [
+	'e_greedy',
+	'e_decaying'
+]
 
 
 # classes--------------------------------------------------------------------
@@ -66,10 +66,10 @@ class Agent:
 
 	Methods
 	-----------------------------------
-	print_qmatrix
+	print_qmatrix()
 		Stampa la matrice Q
 
-	init_qmatrix
+	init_qmatrix()
 		Inizializza la matrice Q
 
 	update_qmatrix(reward)
@@ -92,9 +92,15 @@ class Agent:
 	get_best_next_reachable_states(state)
 		Restituisce la lista degli stati ottimali immediatamente successivi a quello
 		passato in ingresso
+
+	get_optimal()
+		Restituisce la politica ottimale	
+
+	get_qmatrix_str()
+		Restituisce la matrice Q in stringa
 	"""
 
-	def __init__(self, env, alpha=0.7, gamma=0.9, epsilon=0.999, epsilon_mode=EPSILON_MODES['e_decaying'], epsilon_decay=0.95, epsilon_low=0.1):
+	def __init__(self, env, alpha=0.7, gamma=0.9, epsilon=0.999, epsilon_mode=EPSILON_MODES[1], epsilon_decay=0.95, epsilon_low=0.1):
 
 		"""
 		Parameters
@@ -111,7 +117,7 @@ class Agent:
 		(float) epsilon [opt, default = 0.999]
 			Indica il tasso di exploitation/exploration
 
-		(int) epsilon_mode [opt, default = EPSILON_MODES['e_decaying']]
+		(int) epsilon_mode [opt, default = EPSILON_MODES[1]]
 			Indica quale strategia adottare nella selezione delle azioni da eseguire.
 			Sono supportate le strategie e_greedy e e_decay
 
@@ -142,8 +148,8 @@ class Agent:
 		    raise rlexc.InvalidGammaError(gamma)
 		if not 0 <= epsilon <= 1:
 		    raise rlexc.InvalidEpsilonError(epsilon)
-		if not epsilon_mode in EPSILON_MODES.values():
-		    raise rlexc.InvalidEpsilonModeError(epsilon_mode, EPSILON_MODES.keys())
+		if not epsilon_mode in EPSILON_MODES:
+		    raise rlexc.InvalidEpsilonModeError(epsilon_mode, EPSILON_MODES)
 		if not 0 <= epsilon_low <= 1:
 		    raise rlexc.InvalidEpsilonError(epsilon)
 
@@ -211,7 +217,7 @@ class Agent:
 							self.qmatrix[covered_state][action]+
 							self.alpha*(self.gamma*self.get_max_qvalue(next_state)-self.qmatrix[covered_state][action])
 						)
-			if self.epsilon_mode == EPSILON_MODES['e_decaying']:
+			if self.epsilon_mode == EPSILON_MODES[1]:
 				self.epsilon = max(self.epsilon_low, self.epsilon*self.epsilon_decay)
 			self.curr_state = self.env.reset()
 
@@ -220,6 +226,11 @@ class Agent:
 
 		"""
 		Effettua l'azione passata in ingresso
+
+		Parameters
+		-----------------------------------
+		(int) action
+			Azione che si vuole eseguire
 
 		Returns
 		-----------------------------------
@@ -263,6 +274,11 @@ class Agent:
 		-----------------------------------
 		(frozenbag) state
 			Indica lo stato di cui si vuole conoscere il valore Q massimo
+
+		Returns
+		-----------------------------------
+		(float) max
+			Massimo valore Q in corrispondenza dello stato passato in ingresso
 		"""
 
 		return np.max(self.qmatrix[state])
@@ -279,6 +295,12 @@ class Agent:
 		(frozenbag) state
 			Indica lo stato di cui si vogliono conoscere gli stati ottimali 
 			immediatamente successivi
+
+		Returns
+		-----------------------------------
+		(list) best_reachable_states
+			Migliori stati immediatamente raggiungibili (in termini di Q) dallo 
+			stato passato in ingresso
 		"""
 
 		best_reachable_states = []
@@ -293,3 +315,37 @@ class Agent:
 							best_reachable_states = []
 						best_reachable_states.append(reachable_state)
 		return best_reachable_states
+
+
+	def get_optimal(self):
+
+		"""
+		Restituisce la politica ottimale
+
+		Returns
+		-----------------------------------
+		(frozenbag) optimal
+			Politica ottimale appresa
+		"""
+
+		optimal = self.env.get_init_state()
+		while not self.env.is_terminal_state(optimal):
+			optimal = frozenbag(list(optimal) + [np.argmax(self.qmatrix[optimal])])
+		return optimal
+
+
+	def get_qmatrix_str(self):
+
+		"""
+		Restituisce la matrice Q in stringa
+
+		Returns
+		-----------------------------------
+		(str) qmatrix
+			Matrice Q in stringa
+		"""
+
+		qmatrix_str = ""
+		for state in self.qmatrix.keys():
+			qmatrix_str += '   {0:>{1}}: '.format('{' + str(list(state))[1:-1] + '}', 10) + str(self.qmatrix[state]) + '\n'
+		return qmatrix_str
