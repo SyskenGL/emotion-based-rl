@@ -71,7 +71,7 @@ if __name__ == "__main__":
 			self.feedback_required = False
 			self.feedback_provided = False
 			self.feedback_frame = False
-												
+													
 			# status
 			self.rl_session = None
 			self.env = None
@@ -315,6 +315,7 @@ if __name__ == "__main__":
 					'guessed': None,
 					'optimal': None,
 					'qmatrix': None,
+					'td_history': None,
 					'attempts': None,
 					'time': None
 				},
@@ -803,6 +804,7 @@ if __name__ == "__main__":
 			self.rl_session['result']['guessed'] = self.env.is_guessed()
 			self.rl_session['result']['optimal'] = list(self.agent.get_optimal())
 			self.rl_session['result']['qmatrix'] = qmatrix
+			self.rl_session['result']['td_history'] = self.agent.td_history
 			self.rl_session['result']['attempts'] = self.attempts
 			self.rl_session['result']['time'] = time_str
 			for feedback_id in self.rl_session['feedback'].keys():
@@ -912,6 +914,9 @@ if __name__ == "__main__":
 
 									# Se il multiset finale è corretto interrompi e salva i dati
 									if self.env.is_guessed():
+										self.agent.update_qmatrix(CONFIG['rl']['max_evaluation'])
+										self.agent.curr_state = frozenbag(list(self.secret))
+										self.env.attempt = frozenbag(list(self.secret))
 										self.fill_rl_session_result()
 										DB.insert(self.rl_session)
 										self.rl_session = None

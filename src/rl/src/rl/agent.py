@@ -58,6 +58,9 @@ class Agent:
 	(float) epsilon_low
 		Indica il valore minimo consentito di epsilon
 
+	(list) td_history
+		Lista dei TD riscontrati ad ogni aggiornamento
+
 	(frozenbag) curr_state
 		Indica lo stato attuale dell'agente in env
 
@@ -97,7 +100,7 @@ class Agent:
 		Restituisce la politica ottimale	
 	"""
 
-	def __init__(self, env, alpha=0.7, gamma=0.9, epsilon=0.999, epsilon_mode=EPSILON_MODES[1], epsilon_decay=0.95, epsilon_low=0.1):
+	def __init__(self, env, alpha=0.7, gamma=0.9, epsilon=0.999, epsilon_mode=EPSILON_MODES[1], epsilon_decay=0.85, epsilon_low=0.1):
 
 		"""
 		Parameters
@@ -157,6 +160,7 @@ class Agent:
 		self.epsilon_mode = epsilon_mode
 		self.epsilon_decay = epsilon_decay
 		self.epsilon_low = epsilon_low
+		self.td_history = []
 		self.curr_state = self.env.reset()
 		self.qmatrix = self.init_qmatrix()
 
@@ -199,21 +203,23 @@ class Agent:
 		"""
 
 		if self.env.is_terminal_state(self.curr_state):
+			avg_td = (reward-self.qmatrix[self.curr_state][0], 1)
 			self.qmatrix[self.curr_state][:] = (
-				self.qmatrix[self.curr_state][:]+self.alpha*(reward-self.qmatrix[self.curr_state][:])
+				self.qmatrix[self.curr_state][:]+self.alpha*avg_td[0]
 			)
 			coverage = self.env.get_coverage(self.curr_state)
 			coverage.sort(key=len, reverse=True)
 			for covered_state in coverage:
 				best_reachable_states = self.get_best_next_reachable_states(covered_state)
 				if len(best_reachable_states) != 0:
+					td = 0
 					for best_reachable_state in best_reachable_states:
 						action = best_reachable_state['action']
 						next_state = best_reachable_state['state']
-						self.qmatrix[covered_state][action] = (
-							self.qmatrix[covered_state][action]+
-							self.alpha*(self.gamma*self.get_max_qvalue(next_state)-self.qmatrix[covered_state][action])
-						)
+						td = self.gamma*self.get_max_qvalue(next_state)-self.qmatrix[covered_state][action]
+						self.qmatrix[covered_state][action] = (self.qmatrix[covered_state][action]+self.alpha*td)
+					avg_td = (avg_td[0]+td, avg_td[1]+1)
+			self.td_history.append(avg_td[0]/avg_td[1])
 			if self.epsilon_mode == EPSILON_MODES[1]:
 				self.epsilon = max(self.epsilon_low, self.epsilon*self.epsilon_decay)
 			self.curr_state = self.env.reset()
