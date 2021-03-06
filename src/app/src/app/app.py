@@ -905,7 +905,7 @@ if __name__ == "__main__":
 
 							# Altrimenti scegli un'azione da eseguire
 							elif not self.feedback_required:
-								action = self.agent.get_action_from_qmatrix()
+								action = self.agent.get_action()
 								self.feedback_required = self.agent.take_action(action)
 
 								# Se l'azione è terminale incrementa gli attempts
@@ -915,8 +915,6 @@ if __name__ == "__main__":
 									# Se il multiset finale è corretto interrompi e salva i dati
 									if self.env.is_guessed():
 										self.agent.update_qmatrix(CONFIG['rl']['max_evaluation'])
-										self.agent.curr_state = frozenbag(list(self.secret))
-										self.env.attempt = frozenbag(list(self.secret))
 										self.fill_rl_session_result()
 										DB.insert(self.rl_session)
 										self.rl_session = None
@@ -933,10 +931,10 @@ if __name__ == "__main__":
 									self.flash_action_code_selector(action)
 
 							# Riabilita il pulsante di STOP
-							time.sleep(1)
+							#time.sleep(1)
 							self.stoppable = True
 							self.refresh('rl')
-							time.sleep(CONFIG['rl']['epoch_delay'])
+							#time.sleep(CONFIG['rl']['epoch_delay'])
 
 						except:
 							raise

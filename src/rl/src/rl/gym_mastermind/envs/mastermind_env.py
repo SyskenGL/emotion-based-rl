@@ -188,7 +188,7 @@ class MastermindEnv(gym.Env):
 
 		Returns
 		-----------------------------------
-		(list) coverage
+		(set) coverage
 			Copertura dello stato passato in ingresso
 		"""
 
@@ -198,7 +198,7 @@ class MastermindEnv(gym.Env):
 		for k in range(0, len(state)):
 			for covered_state in itertools.combinations(state, k):
 				coverage.add(frozenbag(covered_state))
-		return list(coverage)
+		return coverage
 
 
 	def get_next_reachable_states(self, state):

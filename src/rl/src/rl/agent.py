@@ -11,7 +11,7 @@ from collections_extended import frozenbag
 
 # constants------------------------------------------------------------------
 
-EPSILON_MODES = [
+EXPLORATION_MODES = [
 	'e_greedy',
 	'e_decaying'
 ]
@@ -40,15 +40,15 @@ class Agent:
 	(float) epsilon
 		Indica il tasso di exploitation/exploration
 
-	(int) epsilon_mode
+	(int) exploration_mode
 		Indica quale strategia adottare nella selezione delle azioni da eseguire.
 		Sono supportate le strategie e_greedy e e_decay
 
-	(int) epsilon_mode
+	(int) exploration_mode
 		Indica quale strategia adottare nella selezione delle azioni da eseguire.
 		Sono supportate le strategie e_greedy e e_decay
 
-	(int) epsilon_mode
+	(int) exploration_mode
 		Indica quale strategia adottare nella selezione delle azioni da eseguire.
 		Sono supportate le strategie e_greedy e e_decay
 
@@ -84,7 +84,7 @@ class Agent:
 	take_action(action)
 		Effettua l'azione passata in ingresso
 
-	get_action_from_qmatrix()
+	get_action()
 		Restituisce l'azione da intraprendere. La scelta puo' essere di tipo exploration
 		oppure exploitation, ciò dipende dal valore di epsilon al momento dell'invocazione
 		del metodo.
@@ -100,7 +100,7 @@ class Agent:
 		Restituisce la politica ottimale	
 	"""
 
-	def __init__(self, env, alpha=0.7, gamma=0.9, epsilon=0.999, epsilon_mode=EPSILON_MODES[1], epsilon_decay=0.85, epsilon_low=0.1):
+	def __init__(self, env, alpha=0.7, gamma=0.9, epsilon=0.999, exploration_mode=EXPLORATION_MODES[1], epsilon_decay=0.95, epsilon_low=0.35):
 
 		"""
 		Parameters
@@ -117,14 +117,13 @@ class Agent:
 		(float) epsilon [opt, default = 0.999]
 			Indica il tasso di exploitation/exploration
 
-		(int) epsilon_mode [opt, default = EPSILON_MODES[1]]
-			Indica quale strategia adottare nella selezione delle azioni da eseguire.
-			Sono supportate le strategie e_greedy e e_decay
+		(int) exploration_mode [opt, default = EXPLORATION_MODES[1]]
+			Indica quale strategia di esplorazione
 
 		(float) epsilon_decay [opt, default = 0.95]
 			Indica il fattore di decadimento di epsilon
 
-		(float) epsilon_low [opt, default = 0.1]
+		(float) epsilon_low [opt, default = 0.35]
 			Indica il valore minimo consentito di epsilon
 
 		Raises
@@ -139,7 +138,7 @@ class Agent:
 			Il valore di epsilon e/o epsilon_low non è compreso in [0, 1]
 
 		InvalidEpsilonModeError
-			La strategia indicata non è supportata (non è indicata in EPSILON_MODES)
+			La strategia indicata non è supportata (non è indicata in EXPLORATION_MODES)
 		"""
 
 		if not 0 <= alpha <= 1:
@@ -148,8 +147,8 @@ class Agent:
 		    raise rlexc.InvalidGammaError(gamma)
 		if not 0 <= epsilon <= 1:
 		    raise rlexc.InvalidEpsilonError(epsilon)
-		if not epsilon_mode in EPSILON_MODES:
-		    raise rlexc.InvalidEpsilonModeError(epsilon_mode, EPSILON_MODES)
+		if not exploration_mode in EXPLORATION_MODES:
+		    raise rlexc.InvalidEpsilonModeError(exploration_mode, EXPLORATION_MODES)
 		if not 0 <= epsilon_low <= 1:
 		    raise rlexc.InvalidEpsilonError(epsilon)
 
@@ -157,7 +156,7 @@ class Agent:
 		self.alpha = alpha
 		self.gamma = gamma
 		self.epsilon = epsilon
-		self.epsilon_mode = epsilon_mode
+		self.exploration_mode = exploration_mode
 		self.epsilon_decay = epsilon_decay
 		self.epsilon_low = epsilon_low
 		self.td_history = []
@@ -203,26 +202,22 @@ class Agent:
 		"""
 
 		if self.env.is_terminal_state(self.curr_state):
-			avg_td = (reward-self.qmatrix[self.curr_state][0], 1)
-			self.qmatrix[self.curr_state][:] = (
-				self.qmatrix[self.curr_state][:]+self.alpha*avg_td[0]
-			)
+
+			reward = reward if reward >= 0 else reward*3
 			coverage = self.env.get_coverage(self.curr_state)
-			coverage.sort(key=len, reverse=True)
-			for covered_state in coverage:
-				best_reachable_states = self.get_best_next_reachable_states(covered_state)
-				if len(best_reachable_states) != 0:
-					td = 0
-					for best_reachable_state in best_reachable_states:
-						action = best_reachable_state['action']
-						next_state = best_reachable_state['state']
-						td = self.gamma*self.get_max_qvalue(next_state)-self.qmatrix[covered_state][action]
-						self.qmatrix[covered_state][action] = (self.qmatrix[covered_state][action]+self.alpha*td)
-					avg_td = (avg_td[0]+td, avg_td[1]+1)
-			self.td_history.append(avg_td[0]/avg_td[1])
-			if self.epsilon_mode == EPSILON_MODES[1]:
+
+			for covered_state in sorted(list(coverage), key=len, reverse=True):
+				if not self.env.is_terminal_state(covered_state):
+					for reachable_state in self.env.get_next_reachable_states(covered_state):
+						if reachable_state['state'] in coverage:
+							td = self.gamma*self.get_max_qvalue(reachable_state['state'])-self.qmatrix[covered_state][reachable_state['action']]
+							self.qmatrix[covered_state][reachable_state['action']] = self.qmatrix[covered_state][reachable_state['action']]+self.alpha*td
+				else:
+					td = reward-self.qmatrix[covered_state][0]
+					self.qmatrix[covered_state][:] = self.qmatrix[covered_state][:]+self.alpha*td
+
+			if self.exploration_mode == EXPLORATION_MODES[1]:
 				self.epsilon = max(self.epsilon_low, self.epsilon*self.epsilon_decay)
-			self.curr_state = self.env.reset()
 
 
 	def take_action(self, action):
@@ -245,12 +240,10 @@ class Agent:
 		return done
 
 
-	def get_action_from_qmatrix(self):
+	def get_action(self):
 
 		"""
-		Restituisce l'azione da intraprendere. La scelta puo' essere di tipo exploration
-		oppure exploitation, ciò dipende dal valore di epsilon al momento dell'invocazione
-		del metodo.
+		Restituisce l'azione da intraprendere.
 
 		Returns
 		-----------------------------------
