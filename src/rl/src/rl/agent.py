@@ -5,6 +5,7 @@ import rl_exceptions as rlexc
 import numpy as np
 import itertools
 import random
+import math
 from collections import OrderedDict
 from collections_extended import frozenbag
 
@@ -77,9 +78,14 @@ class Agent:
 
 	update_qmatrix(reward)
 		Aggiorna la matrice Q effettuando una propagazione della ricompensa all'indietro.
-		La propagazione effettua l'aggiornamento considerando le azioni ottimali che possono
-		essere intraprese in un certo stato s il quale può direttamente o indirettamente
-		raggiungere lo stato finale a cui è stata assegnata la ricompensa
+		Tutti gli stati terminali simili allo stato corrente vengono ricompensati in 
+		proporzione alla somiglianza (1, 2, ..., n numeri uguali)
+
+	shape_reward(state, reward, penalty)
+		Modella la ricompensa moltiplicandola per 3 quando negativa e 
+		aggiungendo una penalità proporzionale al numero di volte in cui 
+		lo stato corrente è stato visitato -> R = reward - sqrt(x)/beta dove
+		x è il numero delle volte in cui lo stato è stato visitato
 
 	take_action(action)
 		Effettua l'azione passata in ingresso
@@ -100,7 +106,7 @@ class Agent:
 		Restituisce la politica ottimale	
 	"""
 
-	def __init__(self, env, alpha=0.7, gamma=0.9, epsilon=0.999, exploration_mode=EXPLORATION_MODES[1], epsilon_decay=0.95, epsilon_low=0.35):
+	def __init__(self, env, alpha=0.7, gamma=0.9, epsilon=0.999, beta=0.7, exploration_mode=EXPLORATION_MODES[1], epsilon_decay=0.9, epsilon_low=0.2):
 
 		"""
 		Parameters
@@ -116,6 +122,9 @@ class Agent:
 
 		(float) epsilon [opt, default = 0.999]
 			Indica il tasso di exploitation/exploration
+
+		(float) beta [opt, default = 0.7]
+			Indica il tasso di penalità
 
 		(int) exploration_mode [opt, default = EXPLORATION_MODES[1]]
 			Indica quale strategia di esplorazione
@@ -151,27 +160,36 @@ class Agent:
 		    raise rlexc.InvalidEpsilonModeError(exploration_mode, EXPLORATION_MODES)
 		if not 0 <= epsilon_low <= 1:
 		    raise rlexc.InvalidEpsilonError(epsilon)
+		if not 0 <= beta:
+			raise rlexc.InvalidBetaError(beta)
 
 		self.env = env
 		self.alpha = alpha
 		self.gamma = gamma
 		self.epsilon = epsilon
+		self.beta = beta
 		self.exploration_mode = exploration_mode
 		self.epsilon_decay = epsilon_decay
 		self.epsilon_low = epsilon_low
-		self.td_history = []
 		self.curr_state = self.env.reset()
 		self.qmatrix = self.init_qmatrix()
 
-
-	def print_qmatrix(self):
+		
+	def qmatrix_to_str(self):
 
 		"""
 		Stampa la matrice Q
 		"""
 
+		qmatrix_str = ''
 		for state in self.qmatrix.keys():
-			print '   {0:>{1}}: '.format('{' + str(list(state))[1:-1] + '}', 10) + str(self.qmatrix[state])
+			qmatrix_str += ('   {0:>{1}}: '.format('{' + str(list(state))[1:-1] + '}', 10)
+				+ '\n\t\tqvalues              -> ' + str(self.qmatrix[state]['qvalues'])
+				+ '\n\t\ttd_errors            -> ' + str(self.qmatrix[state]['td_errors'])
+				+ '\n\t\ttd_errors_variations -> ' + str(self.qmatrix[state]['td_errors_variations'])
+				+ '\n\t\tvisits               -> ' + str(self.qmatrix[state]['visits']) + '\n\n'
+			)
+		return qmatrix_str
 
 
 	def init_qmatrix(self):
@@ -180,10 +198,14 @@ class Agent:
 		Inizializza la matrice Q
 		"""
 
-		states = self.env.get_states()
 		qmatrix = OrderedDict()
-		for state in states:
-		    qmatrix[state] = np.full(self.env.action_space.n, 0, dtype = float)
+		for state in self.env.get_states():
+		    qmatrix[state] = {
+		    	'qvalues': np.full(self.env.action_space.n, 0, dtype=float),
+		    	'td_errors': np.full(self.env.action_space.n, 0, dtype=float),
+		    	'td_errors_variations': np.full(self.env.action_space.n, 0, dtype=float),
+		    	'visits': 0
+		    }
 		return qmatrix
 
 
@@ -191,9 +213,8 @@ class Agent:
 
 		"""
 		Aggiorna la matrice Q effettuando una propagazione della ricompensa all'indietro.
-		La propagazione effettua l'aggiornamento considerando le azioni ottimali che possono
-		essere intraprese in un certo stato s il quale può direttamente o indirettamente
-		raggiungere lo stato finale a cui è stata assegnata la ricompensa
+		Tutti gli stati terminali simili allo stato corrente vengono ricompensati in 
+		proporzione alla somiglianza (1, 2, ..., n numeri uguali)
 
 		Parameters
 		-----------------------------------
@@ -201,23 +222,68 @@ class Agent:
 			Indica la ricompensa che l'utente ha assegnato allo stato (finale) raggiunto
 		"""
 
-		if self.env.is_terminal_state(self.curr_state):
+		def update(state, reward):
 
-			reward = reward if reward >= 0 else reward*3
-			coverage = self.env.get_coverage(self.curr_state)
-
+			coverage = self.env.get_coverage(state)
 			for covered_state in sorted(list(coverage), key=len, reverse=True):
 				if not self.env.is_terminal_state(covered_state):
 					for reachable_state in self.env.get_next_reachable_states(covered_state):
 						if reachable_state['state'] in coverage:
-							td = self.gamma*self.get_max_qvalue(reachable_state['state'])-self.qmatrix[covered_state][reachable_state['action']]
-							self.qmatrix[covered_state][reachable_state['action']] = self.qmatrix[covered_state][reachable_state['action']]+self.alpha*td
+							action = reachable_state['action']
+							td = self.alpha*self.gamma*self.get_max_qvalue(reachable_state['state'])-self.qmatrix[covered_state]['qvalues'][action]
+							self.qmatrix[covered_state]['qvalues'][action] = self.qmatrix[covered_state]['qvalues'][action]+td
+							self.qmatrix[covered_state]['td_errors_variations'][action] = abs(self.qmatrix[covered_state]['td_errors'][action]-abs(td))
+							self.qmatrix[covered_state]['td_errors'][action] = abs(td)
 				else:
-					td = reward-self.qmatrix[covered_state][0]
-					self.qmatrix[covered_state][:] = self.qmatrix[covered_state][:]+self.alpha*td
+					td = self.alpha*reward-self.qmatrix[covered_state]['qvalues'][0]
+					self.qmatrix[covered_state]['qvalues'][:] = self.qmatrix[covered_state]['qvalues'][:]+td
+					self.qmatrix[covered_state]['td_errors_variations'][:] = abs(self.qmatrix[covered_state]['td_errors'][0]-abs(td))
+					self.qmatrix[covered_state]['td_errors'][:] = abs(td)
 
+		if self.env.is_terminal_state(self.curr_state):
+			reward = self.shape_reward(self.curr_state, reward, False)
+			for state in self.qmatrix.keys():
+				common_elements = len(self.curr_state&state)
+				if self.env.is_terminal_state(state) and self.qmatrix[state]['visits'] == 0 and (1 <= common_elements <= 2):
+					update(state, reward/self.env.get_terminal_state_len()*common_elements)
+			update(self.curr_state, self.shape_reward(self.curr_state, reward, True))
 			if self.exploration_mode == EXPLORATION_MODES[1]:
 				self.epsilon = max(self.epsilon_low, self.epsilon*self.epsilon_decay)
+
+		for covered_state in self.env.get_coverage(self.curr_state):
+			self.qmatrix[covered_state]['visits'] += 1
+
+
+	def shape_reward(self, state, reward, penalty):
+
+		"""
+		Modella la ricompensa moltiplicandola per 3 quando negativa e 
+		aggiungendo una penalità proporzionale al numero di volte in cui 
+		lo stato corrente è stato visitato -> R = reward - sqrt(x)/beta dove
+		x è il numero delle volte in cui lo stato è stato visitato
+
+		Parameters
+		-----------------------------------
+		(frozenbag) state
+			Stato a cui è attribuita la ricompensa
+
+		(float) reward
+			Indica la ricompensa che l'utente ha assegnato allo stato raggiunto
+
+		(boolean) penalty
+			Indica se la penalità deve essere applicata
+
+		Returns
+		-----------------------------------
+		(float) reward
+			Ricompensa modellata
+		"""
+
+		reward = reward if reward >= 0 else reward*3
+		if penalty:
+			penalty = -(math.sqrt(self.qmatrix[self.curr_state]['visits'])/self.beta)
+			reward += penalty
+		return reward
 
 
 	def take_action(self, action):
@@ -254,9 +320,9 @@ class Agent:
 		if (np.random.uniform(0, 1.0) > (1-self.epsilon)):
 			return self.env.action_space.sample()
 		potential_actions = []
-		max_qvalue = np.max(self.qmatrix[self.curr_state])
+		max_qvalue = self.get_max_qvalue(self.curr_state)
 		for action in range(0, self.env.action_space.n):
-			if max_qvalue == self.qmatrix[self.curr_state][action]:
+			if max_qvalue == self.qmatrix[self.curr_state]['qvalues'][action]:
 				potential_actions.append(action)
 		return random.choice(potential_actions)
 
@@ -277,40 +343,26 @@ class Agent:
 			Massimo valore Q in corrispondenza dello stato passato in ingresso
 		"""
 
-		return np.max(self.qmatrix[state])
+		return np.max(self.qmatrix[state]['qvalues'])
 
 
-	def get_best_next_reachable_states(self, state):
+	def get_argmax_action(self, state):
 
 		"""
-		Restituisce la lista degli stati ottimali immediatamente successivi allo stato
-		passato in ingresso
+		Preleva il massimo valore Q dello stato passato in ingresso
 
 		Parameters
 		-----------------------------------
 		(frozenbag) state
-			Indica lo stato di cui si vogliono conoscere gli stati ottimali 
-			immediatamente successivi
+			Indica lo stato di cui si vuole conoscere il valore Q massimo
 
 		Returns
 		-----------------------------------
-		(list) best_reachable_states
-			Migliori stati immediatamente raggiungibili (in termini di Q) dallo 
-			stato passato in ingresso
+		(float) max
+			Massimo valore Q in corrispondenza dello stato passato in ingresso
 		"""
 
-		best_reachable_states = []
-		reachable_states = self.env.get_next_reachable_states(state)
-		if len(reachable_states) != 0:
-			for reachable_state in reachable_states:
-				if len(best_reachable_states) == 0:
-					best_reachable_states.append(reachable_state)
-				else:
-					if self.get_max_qvalue(best_reachable_states[0]['state']) <= self.get_max_qvalue(reachable_state['state']):
-						if self.get_max_qvalue(best_reachable_states[0]['state']) < self.get_max_qvalue(reachable_state['state']):
-							best_reachable_states = []
-						best_reachable_states.append(reachable_state)
-		return best_reachable_states
+		return np.argmax(self.qmatrix[state]['qvalues'])
 
 
 	def get_optimal(self):
@@ -326,5 +378,5 @@ class Agent:
 
 		optimal = self.env.get_init_state()
 		while not self.env.is_terminal_state(optimal):
-			optimal = frozenbag(list(optimal) + [np.argmax(self.qmatrix[optimal])])
+			optimal = frozenbag(list(optimal) + [self.get_argmax_action(optimal)])
 		return optimal

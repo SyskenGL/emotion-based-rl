@@ -39,8 +39,14 @@ class MastermindEnv(gym.Env):
 	render()
 		unsupported
 
+	get_terminal_state_len()
+		Restituisce la lunghezza degli stati terminali
+
 	get_states()
 		Restituisce tutti i possibili stati
+
+	get_terminal_states()
+		Restituisce tutti i possibili stati terminali
 
 	get_coverage(state)
 		Restituisce la copertura (tutti gli stati che possono raggiungere in 
@@ -60,11 +66,10 @@ class MastermindEnv(gym.Env):
 		Verifica se lo stato passato in ingresso è terminale
 
 	is_guessed(state)
-		Verifica se lo stato passato in ingresso corrisponde
-		alla sequenza segreta
+		Verifica se la sequenza è stata indovinata
 	"""
 
-	def __init__(self, no_pegs, secret):
+	def __init__(self, no_pegs, secret, random_seed):
 
 		"""
 		Parameters
@@ -92,7 +97,9 @@ class MastermindEnv(gym.Env):
 				if not 0 <= peg <= no_pegs:
 					raise rlexc.InvalidActionError(peg)
 
+
 		self.action_space = spaces.Discrete(no_pegs)
+		self.action_space.seed(random_seed)
 		self.secret = secret
 		self.attempt = frozenbag()
 
@@ -152,6 +159,21 @@ class MastermindEnv(gym.Env):
 		raise rlexc.UnsupportedOperationError()
 
 
+	def get_terminal_state_len(self):
+
+		"""
+		Restituisce la lunghezza degli stati terminali
+
+
+		Returns
+		-----------------------------------
+		(int) terminal_state_len
+			Lunghezza degli stati terminali
+		"""
+
+		return len(self.secret)
+
+
 	def get_states(self):
 
 		"""
@@ -168,6 +190,25 @@ class MastermindEnv(gym.Env):
 			for state in itertools.combinations_with_replacement(range(self.action_space.n), k): 
 				states.append(frozenbag(state))
 		return states
+
+
+	def get_terminal_states(self):
+
+		"""
+		Restituisce tutti i possibili stati terminali
+
+		Returns
+		-----------------------------------
+		(list) states
+			Lista degli stati terminali
+		"""
+
+		states = self.get_states()
+		terminal_states = []
+		for state in states:
+			if len(state) == self.get_terminal_state_len():
+				terminal_states.append(state)
+		return terminal_states
 
 
 	def get_coverage(self, state):

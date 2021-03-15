@@ -315,7 +315,6 @@ if __name__ == "__main__":
 					'guessed': None,
 					'optimal': None,
 					'qmatrix': None,
-					'td_history': None,
 					'attempts': None,
 					'time': None
 				},
@@ -799,12 +798,16 @@ if __name__ == "__main__":
 			qmatrix = {}
 			for state in self.agent.qmatrix.keys():
 				state_str = '{' + str(list(state))[1:-1] + '}'
-				qmatrix[state_str] = str(list(self.agent.qmatrix[state]))
+				qmatrix[state_str] = {
+					'qvalues': str(list(self.agent.qmatrix[state]['qvalues'])),
+			    	'td_errors': str(list(self.agent.qmatrix[state]['td_errors'])),
+			    	'td_errors_variations': str(list(self.agent.qmatrix[state]['td_errors_variations'])),
+			    	'visits': self.agent.qmatrix[state]['visits']
+				}
 			time_str = str(int(self.time_secs/60)).zfill(2) + ':' + str(int(self.time_secs%60)).zfill(2)
 			self.rl_session['result']['guessed'] = self.env.is_guessed()
 			self.rl_session['result']['optimal'] = list(self.agent.get_optimal())
 			self.rl_session['result']['qmatrix'] = qmatrix
-			self.rl_session['result']['td_history'] = self.agent.td_history
 			self.rl_session['result']['attempts'] = self.attempts
 			self.rl_session['result']['time'] = time_str
 			for feedback_id in self.rl_session['feedback'].keys():
@@ -878,7 +881,8 @@ if __name__ == "__main__":
 						self.env = gym.make(
 							CONFIG['rl']['gym'], 
 							no_pegs=CONFIG['rl']['no_actions'], 
-							secret=self.secret
+							secret=self.secret,
+							random_seed=np.random.randint(np.iinfo(np.int32).max)
 						)
 						self.agent = Agent(self.env)
 						self.rl_session = self.init_rl_session()
@@ -902,6 +906,7 @@ if __name__ == "__main__":
 								self.agent.update_qmatrix(self.evaluation)
 								self.feedback_provided = False
 								self.agent.curr_state = self.env.reset()
+								print(self.agent.qmatrix_to_str())
 
 							# Altrimenti scegli un'azione da eseguire
 							elif not self.feedback_required:
@@ -921,6 +926,7 @@ if __name__ == "__main__":
 										self.stopped = True
 										self.feedback_required = False
 										self.flash_guessed_code_selector()
+										print(self.agent.qmatrix_to_str())
 
 									# Altrimenti flash azione
 									else:
@@ -931,7 +937,7 @@ if __name__ == "__main__":
 									self.flash_action_code_selector(action)
 
 							# Riabilita il pulsante di STOP
-							#time.sleep(1)
+							time.sleep(0.5)
 							self.stoppable = True
 							self.refresh('rl')
 							#time.sleep(CONFIG['rl']['epoch_delay'])

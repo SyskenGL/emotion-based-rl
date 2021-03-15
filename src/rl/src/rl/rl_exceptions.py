@@ -40,6 +40,18 @@ class InvalidEpsilonError(ValueError):
 
 
 
+class InvalidBetaError(ValueError):
+
+    def __init__(self, beta, message='epsilon beta be in [0, +inf]'):
+        self.beta = beta
+        self.message = message
+        super(ValueError, self).__init__(self.message)
+
+    def __str__(self):
+        return '\'{beta}\' -> {message}'.format(beta=self.beta, message=self.message)
+
+
+
 class InvalidEpsilonModeError(ValueError):
 
     def __init__(self, epsilon_mode, epsilon_modes, message='epsilon_mode must be one of '):
