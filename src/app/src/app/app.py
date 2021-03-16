@@ -307,7 +307,7 @@ if __name__ == "__main__":
 					'alpha': self.agent.alpha,
 					'gamma': self.agent.gamma,
 					'epsilon': self.agent.epsilon,
-					'epsilon_mode': self.agent.epsilon,
+					'exploration_mode': self.agent.exploration_mode,
 					'epsilon_decay': self.agent.epsilon_decay,
 					'epsilon_low': self.agent.epsilon_low
 				},
@@ -926,7 +926,7 @@ if __name__ == "__main__":
 										self.stopped = True
 										self.feedback_required = False
 										self.flash_guessed_code_selector()
-										print(self.agent.qmatrix_to_str())
+										#print(self.agent.qmatrix_to_str())
 
 									# Altrimenti flash azione
 									else:

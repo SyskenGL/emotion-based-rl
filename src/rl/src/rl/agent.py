@@ -106,7 +106,7 @@ class Agent:
 		Restituisce la politica ottimale	
 	"""
 
-	def __init__(self, env, alpha=0.7, gamma=0.9, epsilon=0.999, beta=0.7, exploration_mode=EXPLORATION_MODES[1], epsilon_decay=0.9, epsilon_low=0.2):
+	def __init__(self, env, alpha=0.7, gamma=0.9, epsilon=0.999, beta=0.5, exploration_mode=EXPLORATION_MODES[1], epsilon_decay=0.85, epsilon_low=0.2):
 
 		"""
 		Parameters
@@ -123,16 +123,16 @@ class Agent:
 		(float) epsilon [opt, default = 0.999]
 			Indica il tasso di exploitation/exploration
 
-		(float) beta [opt, default = 0.7]
+		(float) beta [opt, default = 0.5]
 			Indica il tasso di penalità
 
 		(int) exploration_mode [opt, default = EXPLORATION_MODES[1]]
 			Indica quale strategia di esplorazione
 
-		(float) epsilon_decay [opt, default = 0.95]
+		(float) epsilon_decay [opt, default = 0.85]
 			Indica il fattore di decadimento di epsilon
 
-		(float) epsilon_low [opt, default = 0.35]
+		(float) epsilon_low [opt, default = 0.2]
 			Indica il valore minimo consentito di epsilon
 
 		Raises
@@ -235,17 +235,19 @@ class Agent:
 							self.qmatrix[covered_state]['td_errors_variations'][action] = abs(self.qmatrix[covered_state]['td_errors'][action]-abs(td))
 							self.qmatrix[covered_state]['td_errors'][action] = abs(td)
 				else:
-					td = self.alpha*reward-self.qmatrix[covered_state]['qvalues'][0]
+					if self.curr_state == state:
+						td = self.alpha*reward-self.qmatrix[covered_state]['qvalues'][0]
+						self.qmatrix[covered_state]['td_errors_variations'][:] = abs(self.qmatrix[covered_state]['td_errors'][0]-abs(td))
+						self.qmatrix[covered_state]['td_errors'][:] = abs(td)
+					else:
+						td = self.alpha*reward
 					self.qmatrix[covered_state]['qvalues'][:] = self.qmatrix[covered_state]['qvalues'][:]+td
-					self.qmatrix[covered_state]['td_errors_variations'][:] = abs(self.qmatrix[covered_state]['td_errors'][0]-abs(td))
-					self.qmatrix[covered_state]['td_errors'][:] = abs(td)
 
 		if self.env.is_terminal_state(self.curr_state):
-			reward = self.shape_reward(self.curr_state, reward, False)
 			for state in self.qmatrix.keys():
 				common_elements = len(self.curr_state&state)
 				if self.env.is_terminal_state(state) and self.qmatrix[state]['visits'] == 0 and (1 <= common_elements <= 2):
-					update(state, reward/self.env.get_terminal_state_len()*common_elements)
+					update(state, self.shape_reward(self.curr_state, reward, False)/self.env.get_terminal_state_len()*common_elements)
 			update(self.curr_state, self.shape_reward(self.curr_state, reward, True))
 			if self.exploration_mode == EXPLORATION_MODES[1]:
 				self.epsilon = max(self.epsilon_low, self.epsilon*self.epsilon_decay)
@@ -281,8 +283,8 @@ class Agent:
 
 		reward = reward if reward >= 0 else reward*3
 		if penalty:
-			penalty = -(math.sqrt(self.qmatrix[self.curr_state]['visits'])/self.beta)
-			reward += penalty
+			reward_penalty = -(math.sqrt(self.qmatrix[self.curr_state]['visits'])/self.beta)
+			reward += reward_penalty
 		return reward
 
 
