@@ -65,6 +65,10 @@ class Agent:
 	(frozenbag) curr_state
 		Indica lo stato attuale dell'agente in env
 
+	(dict) reward_info
+		Indica l'ultima ricompensa utente fornita e 
+		la variazione rispetto alla precedente
+
 	(OrderedDict) qmatrix
 		Indica la matrice Q dell'agente
 
@@ -106,7 +110,7 @@ class Agent:
 		Restituisce la politica ottimale	
 	"""
 
-	def __init__(self, env, alpha=0.7, gamma=0.9, epsilon=0.999, beta=0.5, exploration_mode=EXPLORATION_MODES[1], epsilon_decay=0.85, epsilon_low=0.2):
+	def __init__(self, env, alpha=0.7, gamma=0.9, epsilon=0.999, beta=0.5, exploration_mode=EXPLORATION_MODES[1], epsilon_decay=0.7, epsilon_low=0.2):
 
 		"""
 		Parameters
@@ -172,6 +176,10 @@ class Agent:
 		self.epsilon_decay = epsilon_decay
 		self.epsilon_low = epsilon_low
 		self.curr_state = self.env.reset()
+		self.reward_info = {
+			'reward': 0,
+			'reward_delta': 0
+		}
 		self.qmatrix = self.init_qmatrix()
 
 		
@@ -184,10 +192,10 @@ class Agent:
 		qmatrix_str = ''
 		for state in self.qmatrix.keys():
 			qmatrix_str += ('   {0:>{1}}: '.format('{' + str(list(state))[1:-1] + '}', 10)
-				+ '\n\t\tqvalues              -> ' + str(self.qmatrix[state]['qvalues'])
-				+ '\n\t\ttd_errors            -> ' + str(self.qmatrix[state]['td_errors'])
-				+ '\n\t\ttd_errors_variations -> ' + str(self.qmatrix[state]['td_errors_variations'])
-				+ '\n\t\tvisits               -> ' + str(self.qmatrix[state]['visits']) + '\n\n'
+				+ '\n\t\tqvalues         -> ' + str(self.qmatrix[state]['qvalues'])
+				+ '\n\t\ttd_errors       -> ' + str(self.qmatrix[state]['td_errors'])
+				+ '\n\t\ttd_errors_delta -> ' + str(self.qmatrix[state]['td_errors_delta'])
+				+ '\n\t\tvisits          -> ' + str(self.qmatrix[state]['visits']) + '\n\n'
 			)
 		return qmatrix_str
 
@@ -203,7 +211,7 @@ class Agent:
 		    qmatrix[state] = {
 		    	'qvalues': np.full(self.env.action_space.n, 0, dtype=float),
 		    	'td_errors': np.full(self.env.action_space.n, 0, dtype=float),
-		    	'td_errors_variations': np.full(self.env.action_space.n, 0, dtype=float),
+		    	'td_errors_delta': np.full(self.env.action_space.n, 0, dtype=float),
 		    	'visits': 0
 		    }
 		return qmatrix
@@ -230,24 +238,27 @@ class Agent:
 					for reachable_state in self.env.get_next_reachable_states(covered_state):
 						if reachable_state['state'] in coverage:
 							action = reachable_state['action']
-							td = self.alpha*self.gamma*self.get_max_qvalue(reachable_state['state'])-self.qmatrix[covered_state]['qvalues'][action]
-							self.qmatrix[covered_state]['qvalues'][action] = self.qmatrix[covered_state]['qvalues'][action]+td
-							self.qmatrix[covered_state]['td_errors_variations'][action] = abs(self.qmatrix[covered_state]['td_errors'][action]-abs(td))
+							td = self.gamma*self.get_max_qvalue(reachable_state['state'])-self.qmatrix[covered_state]['qvalues'][action]
+							self.qmatrix[covered_state]['qvalues'][action] = self.qmatrix[covered_state]['qvalues'][action]+self.alpha*td
+							self.qmatrix[covered_state]['td_errors_delta'][action] = abs(self.qmatrix[covered_state]['td_errors'][action]-td)
 							self.qmatrix[covered_state]['td_errors'][action] = abs(td)
 				else:
 					if self.curr_state == state:
-						td = self.alpha*reward-self.qmatrix[covered_state]['qvalues'][0]
-						self.qmatrix[covered_state]['td_errors_variations'][:] = abs(self.qmatrix[covered_state]['td_errors'][0]-abs(td))
+						td = reward-self.qmatrix[covered_state]['qvalues'][0]
+						self.qmatrix[covered_state]['td_errors_delta'][:] = abs(self.qmatrix[covered_state]['td_errors'][0]-td)
 						self.qmatrix[covered_state]['td_errors'][:] = abs(td)
 					else:
-						td = self.alpha*reward
-					self.qmatrix[covered_state]['qvalues'][:] = self.qmatrix[covered_state]['qvalues'][:]+td
+						td = reward
+					self.qmatrix[covered_state]['qvalues'][:] = self.qmatrix[covered_state]['qvalues'][:]+self.alpha*td
 
 		if self.env.is_terminal_state(self.curr_state):
+			reward = self.shape_reward(self.curr_state, reward, False)
+			self.reward_info['reward_delta'] = abs(self.reward_info['reward']-reward)
+			self.reward_info['reward'] = reward
 			for state in self.qmatrix.keys():
 				common_elements = len(self.curr_state&state)
 				if self.env.is_terminal_state(state) and self.qmatrix[state]['visits'] == 0 and (1 <= common_elements <= 2):
-					update(state, self.shape_reward(self.curr_state, reward, False)/self.env.get_terminal_state_len()*common_elements)
+					update(state, reward/self.env.get_terminal_state_len()*common_elements/2)
 			update(self.curr_state, self.shape_reward(self.curr_state, reward, True))
 			if self.exploration_mode == EXPLORATION_MODES[1]:
 				self.epsilon = max(self.epsilon_low, self.epsilon*self.epsilon_decay)

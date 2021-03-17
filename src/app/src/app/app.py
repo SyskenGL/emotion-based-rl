@@ -301,12 +301,13 @@ if __name__ == "__main__":
 			return {
 				'session_id': CONFIG['rl']['session_prefix'] + str(int(time.time()*1000)),
 				'config': {
-					'secret': list(self.secret),
+					'secret': sorted(list(self.secret)),
 					'no_pegs': self.env.action_space.n,
 					'code_len': len(self.env.secret),
 					'alpha': self.agent.alpha,
 					'gamma': self.agent.gamma,
 					'epsilon': self.agent.epsilon,
+					'beta': self.agent.beta,
 					'exploration_mode': self.agent.exploration_mode,
 					'epsilon_decay': self.agent.epsilon_decay,
 					'epsilon_low': self.agent.epsilon_low
@@ -801,7 +802,7 @@ if __name__ == "__main__":
 				qmatrix[state_str] = {
 					'qvalues': str(list(self.agent.qmatrix[state]['qvalues'])),
 			    	'td_errors': str(list(self.agent.qmatrix[state]['td_errors'])),
-			    	'td_errors_variations': str(list(self.agent.qmatrix[state]['td_errors_variations'])),
+			    	'td_errors_variations': str(list(self.agent.qmatrix[state]['td_errors_delta'])),
 			    	'visits': self.agent.qmatrix[state]['visits']
 				}
 			time_str = str(int(self.time_secs/60)).zfill(2) + ':' + str(int(self.time_secs%60)).zfill(2)
@@ -926,7 +927,7 @@ if __name__ == "__main__":
 										self.stopped = True
 										self.feedback_required = False
 										self.flash_guessed_code_selector()
-										#print(self.agent.qmatrix_to_str())
+										print(self.agent.get_optimal())
 
 									# Altrimenti flash azione
 									else:
