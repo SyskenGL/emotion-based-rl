@@ -927,7 +927,6 @@ if __name__ == "__main__":
 										self.stopped = True
 										self.feedback_required = False
 										self.flash_guessed_code_selector()
-										print(self.agent.get_optimal())
 
 									# Altrimenti flash azione
 									else:

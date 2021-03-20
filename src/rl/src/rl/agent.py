@@ -182,6 +182,9 @@ class Agent:
 		}
 		self.qmatrix = self.init_qmatrix()
 
+		self.action_td_errors = []
+		self.action_td_errors_delta = []
+
 		
 	def qmatrix_to_str(self):
 
@@ -210,8 +213,8 @@ class Agent:
 		for state in self.env.get_states():
 		    qmatrix[state] = {
 		    	'qvalues': np.full(self.env.action_space.n, 0, dtype=float),
-		    	'td_errors': np.full(self.env.action_space.n, 0, dtype=float),
-		    	'td_errors_delta': np.full(self.env.action_space.n, 0, dtype=float),
+		    	'td_errors': np.full(self.env.action_space.n, -np.inf, dtype=float),
+		    	'td_errors_delta': np.full(self.env.action_space.n, -np.inf, dtype=float),
 		    	'visits': 0
 		    }
 		return qmatrix
@@ -238,28 +241,28 @@ class Agent:
 					for reachable_state in self.env.get_next_reachable_states(covered_state):
 						if reachable_state['state'] in coverage:
 							action = reachable_state['action']
-							td = self.gamma*self.get_max_qvalue(reachable_state['state'])-self.qmatrix[covered_state]['qvalues'][action]
-							self.qmatrix[covered_state]['qvalues'][action] = self.qmatrix[covered_state]['qvalues'][action]+self.alpha*td
-							self.qmatrix[covered_state]['td_errors_delta'][action] = abs(self.qmatrix[covered_state]['td_errors'][action]-td)
-							self.qmatrix[covered_state]['td_errors'][action] = abs(td)
+							td = self.alpha*(self.gamma*self.get_max_qvalue(reachable_state['state'])-self.qmatrix[covered_state]['qvalues'][action])
+							self.qmatrix[covered_state]['qvalues'][action] = self.qmatrix[covered_state]['qvalues'][action]+td
+							self.qmatrix[covered_state]['td_errors_delta'][action] = td-self.qmatrix[covered_state]['td_errors'][action]
+							self.qmatrix[covered_state]['td_errors'][action] = td
 				else:
 					if self.curr_state == state:
-						td = reward-self.qmatrix[covered_state]['qvalues'][0]
-						self.qmatrix[covered_state]['td_errors_delta'][:] = abs(self.qmatrix[covered_state]['td_errors'][0]-td)
-						self.qmatrix[covered_state]['td_errors'][:] = abs(td)
+						td = self.alpha*(reward-self.qmatrix[covered_state]['qvalues'][0])
+						self.qmatrix[covered_state]['td_errors_delta'][:] = td-self.qmatrix[covered_state]['td_errors'][0]
+						self.qmatrix[covered_state]['td_errors'][:] = td
 					else:
-						td = reward
-					self.qmatrix[covered_state]['qvalues'][:] = self.qmatrix[covered_state]['qvalues'][:]+self.alpha*td
+						td = self.alpha*reward
+					self.qmatrix[covered_state]['qvalues'][:] = self.qmatrix[covered_state]['qvalues'][:]+td
 
 		if self.env.is_terminal_state(self.curr_state):
-			reward = self.shape_reward(self.curr_state, reward, False)
+			reward = reward if reward >= 0 else reward*3
 			self.reward_info['reward_delta'] = abs(self.reward_info['reward']-reward)
 			self.reward_info['reward'] = reward
 			for state in self.qmatrix.keys():
 				common_elements = len(self.curr_state&state)
 				if self.env.is_terminal_state(state) and self.qmatrix[state]['visits'] == 0 and (1 <= common_elements <= 2):
-					update(state, reward/self.env.get_terminal_state_len()*common_elements/2)
-			update(self.curr_state, self.shape_reward(self.curr_state, reward, True))
+					update(state, reward/self.env.get_terminal_state_len()*common_elements)
+			update(self.curr_state, reward)
 			if self.exploration_mode == EXPLORATION_MODES[1]:
 				self.epsilon = max(self.epsilon_low, self.epsilon*self.epsilon_decay)
 
@@ -267,7 +270,7 @@ class Agent:
 			self.qmatrix[covered_state]['visits'] += 1
 
 
-	def shape_reward(self, state, reward, penalty):
+	def shape_reward(self, state, reward):
 
 		"""
 		Modella la ricompensa moltiplicandola per 3 quando negativa e 
@@ -283,19 +286,14 @@ class Agent:
 		(float) reward
 			Indica la ricompensa che l'utente ha assegnato allo stato raggiunto
 
-		(boolean) penalty
-			Indica se la penalità deve essere applicata
-
 		Returns
 		-----------------------------------
 		(float) reward
 			Ricompensa modellata
 		"""
 
-		reward = reward if reward >= 0 else reward*3
-		if penalty:
-			reward_penalty = -(math.sqrt(self.qmatrix[self.curr_state]['visits'])/self.beta)
-			reward += reward_penalty
+		reward_penalty = -(math.sqrt(self.qmatrix[self.curr_state]['visits'])/self.beta)
+		reward += reward_penalty
 		return reward
 
 
@@ -315,6 +313,8 @@ class Agent:
 			Indica se il nuovo stato è terminale
 		"""
 
+		self.action_td_errors.append((self.qmatrix[self.curr_state]['qvalues'][action], self.qmatrix[self.curr_state]['td_errors'][action]))
+		self.action_td_errors_delta.append((self.qmatrix[self.curr_state]['td_errors'][action], self.qmatrix[self.curr_state]['td_errors_delta'][action]))
 		self.curr_state, done = self.env.step(action)
 		return done
 
